@@ -183,16 +183,6 @@
   #about .keys{ font-size:13.5px; color:var(--muted); }
   #about kbd{ font:12px var(--font-body); border:1px solid var(--border); border-bottom-width:2px; border-radius:4px; padding:0 5px; color:var(--ink); }
 
-  /* Snapshot modal */
-  #shot{
-    position:absolute; inset:0; z-index:30; background:rgba(10,8,13,.82);
-    display:flex; align-items:center; justify-content:center; padding:20px;
-  }
-  #shot .box{ border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px; max-height:100%; max-width:min(720px, 100%); }
-  #shot .box p{ margin:0; font-size:14.5px; color:var(--muted); }
-  #shot .imgwrap{ min-height:0; overflow:auto; border-radius:8px; background:var(--bg); }
-  #shot img{ display:block; width:100%; height:auto; }
-  #shot .row{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
 
   @media (max-width: 720px){
     #toolbar{
@@ -268,7 +258,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.8c0-.4.4-.8.9-.8h4.2c.5 0 .9.4.9.8V7"/><path d="M6 7l1 12.2c0 1 .8 1.8 1.8 1.8h6.4c1 0 1.8-.8 1.8-1.8L18 7"/></svg>
       </button>
       <div class="tsep"></div>
-      <button class="tbtn" id="btnShot" title="Snapshot: save or copy your annotated page" aria-label="Snapshot">
+      <button class="tbtn" id="btnShot" title="Screenshot: download your annotated page as a PNG" aria-label="Download screenshot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.3"/></svg>
       </button>
     </div>
@@ -305,21 +295,9 @@
       </ol>
       <h3>Shortcuts</h3>
       <p class="keys"><kbd>V</kbd> move · <kbd>N</kbd> note · <kbd>A</kbd> arrow · <kbd>T</kbd> text · <kbd>D</kbd> draw · <kbd>Delete</kbd> removes the selection · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · double-click a label to edit it</p>
-      <p class="keys">Your annotations are saved in this browser on this device. Use the snapshot button to keep a copy or hand it in.</p>
+      <p class="keys">Your annotations are saved in this browser on this device. Use the screenshot button to download a PNG of your annotated page to keep or hand in.</p>
       <p class="keys">Image: <a href="https://www.digitale-sammlungen.de/view/bsb00096593?page=58" target="_blank" rel="noopener">Münchener DigitalisierungsZentrum</a>, Public Domain Mark 1.0.</p>
     </aside>
-
-    <div id="shot" hidden>
-      <div class="box panel">
-        <p>Download the annotated page, or right-click (press and hold on a phone) the image to copy it. You can also copy your notes and labels as text.</p>
-        <div class="imgwrap"><img id="shotImg" alt="Annotated snapshot of the Luke page"></div>
-        <div class="row">
-          <button class="mbtn" id="copyText">Copy notes as text</button>
-          <a class="mbtn" id="shotDownload" download="otto-iii-luke-annotated.png" style="text-decoration:none;">Download PNG</a>
-          <button class="mbtn primary" id="shotClose">Done</button>
-        </div>
-      </div>
-    </div>
   </main>
 </div>
 
@@ -622,7 +600,6 @@
     const ae = document.activeElement;
     const editing = ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT' || ae.isContentEditable);
     if (e.key === 'Escape') {
-      if (!$('shot').hidden) { $('shot').hidden = true; return; }
       if (!$('confirmBar').hidden) { $('confirmBar').hidden = true; return; }
       if (editing) { ae.blur(); return; }
       select(null); return;
@@ -932,33 +909,14 @@
   }
   $('btnShot').addEventListener('click', () => {
     if (document.activeElement) document.activeElement.blur();
-    try { const url = makeSnapshot(); $('shotImg').src = url; $('shotDownload').href = url; $('shot').hidden = false; }
-    catch(err) { flash('The snapshot could not be drawn in this browser.'); }
-  });
-  $('shotClose').addEventListener('click', () => { $('shot').hidden = true; });
-  $('shot').addEventListener('click', e => { if (e.target.id === 'shot') $('shot').hidden = true; });
-
-  function annotationsAsText(){
-    const notes = annotations.filter(a => a.type === 'note' && a.text.trim());
-    const labels = annotations.filter(a => a.type === 'text' && a.text.trim());
-    const arrows = annotations.filter(a => a.type === 'arrow').length;
-    const strokes = annotations.filter(a => a.type === 'draw').length;
-    const lines = ['Gospels of Otto III, Evangelist Luke (BSB Clm 4453, fol. 139v)', ''];
-    if (notes.length) { lines.push('Notes:'); notes.forEach((n,i) => lines.push(`${i+1}. ${n.text.trim().replace(/\n+/g, ' ')}`)); lines.push(''); }
-    if (labels.length) { lines.push('Labels:'); labels.forEach(l => lines.push(`- ${l.text.trim()}`)); lines.push(''); }
-    lines.push(`Arrows: ${arrows} · Freehand marks: ${strokes}`);
-    return lines.join('\n');
-  }
-  $('copyText').addEventListener('click', () => {
-    const txt = annotationsAsText();
-    const done = () => flash('Notes copied');
-    const fallback = () => {
-      const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); done(); } catch(_) { flash('Copy was blocked. Select the text manually.'); }
-      ta.remove();
-    };
-    try { navigator.clipboard.writeText(txt).then(done, fallback); } catch(_) { fallback(); }
+    let url;
+    try { url = makeSnapshot(); }
+    catch(err) { flash('The screenshot could not be drawn in this browser.'); return; }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'otto-iii-luke-annotated.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    flash('Screenshot downloaded');
   });
 
   // ---------- boot ----------
